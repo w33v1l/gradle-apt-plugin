@@ -69,6 +69,35 @@ class AptPluginSpec extends PluginProjectSpec {
     }
   }
 
+  def 'empty scala project'() {
+    when:
+    project.apply plugin: pluginName
+    project.apply plugin: 'scala'
+    project.evaluate()
+
+    then:
+    project.configurations.findByName('apt')
+    project.configurations.findByName('testApt')
+    project.configurations.findByName('compileOnly')
+    project.configurations.findByName('testCompileOnly')
+    with(project.tasks.compileJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/main').path ])
+      !compilerArgs.contains('-processorpath')
+    }
+    with(project.tasks.compileScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/main').path ])
+      !compilerArgs.contains('-processorpath')
+    }
+    with(project.tasks.compileTestJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/test').path ])
+      !compilerArgs.contains('-processorpath')
+    }
+    with(project.tasks.compileTestScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/test').path ])
+      !compilerArgs.contains('-processorpath')
+    }
+  }
+
   def 'project with annotation processors'() {
     setup:
     def mavenRepo = new GradleDependencyGenerator(
@@ -94,6 +123,7 @@ class AptPluginSpec extends PluginProjectSpec {
     when:
     project.apply plugin: pluginName
     project.apply plugin: 'groovy'
+    project.apply plugin: 'scala'
     project.repositories {
       maven { url mavenRepo }
     }
@@ -114,11 +144,19 @@ class AptPluginSpec extends PluginProjectSpec {
       compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/main').path, '-processorpath', project.configurations.apt.asPath ])
       !compilerArgs.any { arg -> project.configurations.compile.files.any { arg.contains(it.path) } }
     }
+    with(project.tasks.compileScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/main').path, '-processorpath', project.configurations.apt.asPath ])
+      !compilerArgs.any { arg -> project.configurations.compile.files.any { arg.contains(it.path) } }
+    }
     with(project.tasks.compileTestJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
       compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/test').path, '-processorpath', project.configurations.testApt.asPath ])
       !compilerArgs.any { arg -> project.configurations.testCompile.files.any { arg.contains(it.path) } }
     }
     with(project.tasks.compileTestGroovy.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
+      compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/test').path, '-processorpath', project.configurations.testApt.asPath ])
+      !compilerArgs.any { arg -> project.configurations.testCompile.files.any { arg.contains(it.path) } }
+    }
+    with(project.tasks.compileTestScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()) { compilerArgs ->
       compilerArgs.containsAll([ '-s', new File(project.buildDir, 'generated/source/apt/test').path, '-processorpath', project.configurations.testApt.asPath ])
       !compilerArgs.any { arg -> project.configurations.testCompile.files.any { arg.contains(it.path) } }
     }
@@ -153,6 +191,7 @@ class AptPluginSpec extends PluginProjectSpec {
     when:
     project.apply plugin: pluginName
     project.apply plugin: 'groovy'
+    project.apply plugin: 'scala'
     project.repositories {
       maven { url mavenRepo }
     }
@@ -167,34 +206,45 @@ class AptPluginSpec extends PluginProjectSpec {
       testAnnotationProcessor 'processor:testCompile:1.0'
     }
     project.tasks.compileJava {
-      generatedSourcesDestinationDir = 'src/main/generated'
+      generatedSourcesDestinationDir = 'src/main/generatedJava'
       aptOptions.processorpath = project.configurations.annotationProcessor
     }
     project.tasks.compileGroovy {
-      generatedSourcesDestinationDir = 'src/main/generated'
+      generatedSourcesDestinationDir = 'src/main/generatedGroovy'
+      aptOptions.processorpath = project.configurations.annotationProcessor
+    }
+    project.tasks.compileScala {
+      generatedSourcesDestinationDir = 'src/main/generatedScala'
       aptOptions.processorpath = project.configurations.annotationProcessor
     }
     project.tasks.compileTestJava {
-      generatedSourcesDestinationDir = 'src/test/generated'
+      generatedSourcesDestinationDir = 'src/test/generatedJava'
       aptOptions.processorpath = project.configurations.testAnnotationProcessor
     }
     project.tasks.compileTestGroovy {
-      generatedSourcesDestinationDir = 'src/test/generated'
+      generatedSourcesDestinationDir = 'src/test/generatedGroovy'
+      aptOptions.processorpath = project.configurations.testAnnotationProcessor
+    }
+    project.tasks.compileTestScala {
+      generatedSourcesDestinationDir = 'src/test/generatedScala'
       aptOptions.processorpath = project.configurations.testAnnotationProcessor
     }
     project.evaluate()
 
     then:
     project.tasks.compileJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
-            .containsAll([ '-s', new File(project.projectDir, 'src/main/generated').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
+            .containsAll([ '-s', new File(project.projectDir, 'src/main/generatedJava').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
     project.tasks.compileGroovy.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
-            .containsAll([ '-s', new File(project.projectDir, 'src/main/generated').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
+            .containsAll([ '-s', new File(project.projectDir, 'src/main/generatedGroovy').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
+    project.tasks.compileScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
+            .containsAll([ '-s', new File(project.projectDir, 'src/main/generatedScala').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
     project.tasks.compileTestJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
-            .containsAll([ '-s', new File(project.projectDir, 'src/test/generated').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
+            .containsAll([ '-s', new File(project.projectDir, 'src/test/generatedJava').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
     project.tasks.compileTestGroovy.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
-            .containsAll([ '-s', new File(project.projectDir, 'src/test/generated').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
+            .containsAll([ '-s', new File(project.projectDir, 'src/test/generatedGroovy').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
+    project.tasks.compileTestScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
+            .containsAll([ '-s', new File(project.projectDir, 'src/test/generatedScala').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
   }
-
 
   def 'project with annotation processors through SourceSet'() {
     setup:
@@ -221,6 +271,7 @@ class AptPluginSpec extends PluginProjectSpec {
     when:
     project.apply plugin: pluginName
     project.apply plugin: 'groovy'
+    project.apply plugin: 'scala'
     project.repositories {
       maven { url mavenRepo }
     }
@@ -249,9 +300,13 @@ class AptPluginSpec extends PluginProjectSpec {
             .containsAll([ '-s', new File(project.projectDir, 'src/main/generated').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
     project.tasks.compileGroovy.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
             .containsAll([ '-s', new File(project.projectDir, 'src/main/generated').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
+    project.tasks.compileScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
+            .containsAll([ '-s', new File(project.projectDir, 'src/main/generated').path, '-processorpath', project.configurations.annotationProcessor.asPath ])
     project.tasks.compileTestJava.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
             .containsAll([ '-s', new File(project.projectDir, 'src/test/generated').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
     project.tasks.compileTestGroovy.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
+            .containsAll([ '-s', new File(project.projectDir, 'src/test/generated').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
+    project.tasks.compileTestScala.convention.getPlugin(AptPlugin.AptConvention).buildCompilerArgs()
             .containsAll([ '-s', new File(project.projectDir, 'src/test/generated').path, '-processorpath', project.configurations.testAnnotationProcessor.asPath ])
   }
 
@@ -280,6 +335,7 @@ class AptPluginSpec extends PluginProjectSpec {
     when:
     project.apply plugin: pluginName
     project.apply plugin: 'groovy'
+    project.apply plugin: 'scala'
     project.repositories {
       maven { url mavenRepo }
     }
@@ -296,10 +352,13 @@ class AptPluginSpec extends PluginProjectSpec {
     project.sourceSets.test.compileClasspath.files == project.files(project.sourceSets.main.output, project.configurations.testCompileOnly).files
     project.tasks.compileJava.classpath == project.sourceSets.main.compileClasspath
     project.tasks.compileGroovy.classpath == project.sourceSets.main.compileClasspath
+    project.tasks.compileScala.classpath == project.sourceSets.main.compileClasspath
     project.tasks.compileTestJava.classpath == project.sourceSets.test.compileClasspath
     project.tasks.compileTestGroovy.classpath == project.sourceSets.test.compileClasspath
+    project.tasks.compileTestScala.classpath == project.sourceSets.test.compileClasspath
     project.tasks.javadoc.classpath.files == project.sourceSets.main.output.plus(project.configurations.compileOnly).files
     project.tasks.groovydoc.classpath.files == project.sourceSets.main.output.plus(project.configurations.compileOnly).files
+    project.tasks.scaladoc.classpath.files == project.sourceSets.main.output.plus(project.configurations.compileOnly).files
     project.configurations.compile.resolvedConfiguration.resolvedArtifacts*.moduleVersion.id.collect { "$it.group:$it.name:$it.version" as String }.toSet()
         .equals([ 'compile:compile:1.0', 'leaf:compile:1.0' ] as Set)
     project.configurations.compileOnly.resolvedConfiguration.resolvedArtifacts*.moduleVersion.id.collect { "$it.group:$it.name:$it.version" as String }.toSet()

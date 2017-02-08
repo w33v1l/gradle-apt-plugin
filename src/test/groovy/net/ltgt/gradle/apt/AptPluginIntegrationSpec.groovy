@@ -255,4 +255,132 @@ class AptPluginIntegrationSpec extends Specification {
     where:
     gradleVersion << IntegrationTestHelper.GRADLE_VERSIONS
   }
+
+  @Unroll
+  def "simple scala project, with Gradle #gradleVersion"() {
+    given:
+    buildFile << """\
+      apply plugin: 'net.ltgt.apt'
+
+      apply plugin: 'scala'
+
+      repositories {
+        mavenCentral()
+      }
+
+      dependencies {
+        compile 'org.scala-lang:scala-library:2.12.1'
+      }
+    """.stripIndent()
+
+    def f = new File(testProjectDir.newFolder('src', 'main', 'scala', 'simple'), 'HelloWorld.scala')
+    f.createNewFile()
+    f << """\
+      package simple
+      
+      class HelloWorld {
+        def sayHello(name: String): Unit = {
+          println("Hello, world!" + name)
+        }
+      }
+    """.stripIndent()
+
+    f = new File(testProjectDir.newFolder('src', 'test', 'scala', 'simple'), 'HelloWorldTest.scala')
+    f.createNewFile()
+    f << """\
+      package simple
+
+      object HelloWorldTest {
+        // Not a real unit-test
+        def main(args: Array[String]): Unit = {
+          println(new HelloWorld().sayHello("World"))
+        }
+      }
+    """.stripIndent()
+
+    when:
+    def result = GradleRunner.create()
+        .withGradleVersion(gradleVersion)
+        .withProjectDir(testProjectDir.root)
+        .withArguments('compileTestScala')
+        .build()
+
+    then:
+    result.task(':compileScala').outcome == TaskOutcome.SUCCESS
+    result.task(':compileTestScala').outcome == TaskOutcome.SUCCESS
+
+    where:
+    gradleVersion << IntegrationTestHelper.GRADLE_VERSIONS
+  }
+
+  @Unroll
+  def "simple scala project with compile-only dependency, with Gradle #gradleVersion"() {
+    given:
+    def settingsFile = testProjectDir.newFile('settings.gradle')
+    settingsFile << """\
+      include 'annotations'
+      include 'core'
+    """.stripIndent()
+
+    buildFile << """\
+      project('annotations') {
+        apply plugin: 'java'
+      }
+      project('core') {
+        apply plugin: 'scala'
+        apply plugin: 'net.ltgt.apt'
+
+        repositories {
+          mavenCentral()
+        }
+
+        dependencies {
+          compileOnly project(':annotations')
+          compile 'org.scala-lang:scala-library:2.12.1'
+        }
+      }
+    """.stripIndent()
+
+    def f = new File(testProjectDir.newFolder('annotations', 'src', 'main', 'java', 'annotations'), 'MyAnnotation.java')
+    f.createNewFile()
+    f << """\
+      package annotations;
+
+      import java.lang.annotation.Documented;
+
+      public @interface MyAnnotation {
+      }
+    """.stripIndent()
+
+    f = new File(testProjectDir.newFolder('core', 'src', 'main', 'scala', 'core'), 'HelloWorld.scala')
+    f.createNewFile()
+    f << """\
+      package core
+      import annotations.MyAnnotation
+      @MyAnnotation
+      object HelloWorld {
+        def main(args: Array[String]): Unit = {
+          println("Hello, world!")
+        }
+      }
+    """.stripIndent()
+
+    expect:
+
+    when:
+    def result = GradleRunner.create()
+        .withGradleVersion(gradleVersion)
+        .withProjectDir(testProjectDir.root)
+        .withArguments(':core:scaladoc')
+        .build()
+
+    then:
+    result.task(':annotations:compileJava').outcome == TaskOutcome.SUCCESS
+    result.task(':core:compileScala').outcome == TaskOutcome.SUCCESS
+    result.task(':core:scaladoc').outcome == TaskOutcome.SUCCESS
+
+    where:
+    gradleVersion << IntegrationTestHelper.GRADLE_VERSIONS
+  }
+
 }

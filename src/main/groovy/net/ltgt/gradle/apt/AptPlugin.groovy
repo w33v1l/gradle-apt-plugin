@@ -8,11 +8,13 @@ import org.gradle.api.plugins.GroovyBasePlugin
 import org.gradle.api.plugins.JavaBasePlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginConvention
+import org.gradle.api.plugins.scala.ScalaBasePlugin
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.SourceSet
 import org.gradle.api.tasks.compile.AbstractCompile
 import org.gradle.api.tasks.compile.GroovyCompile
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.api.tasks.scala.ScalaCompile
 import org.gradle.plugins.ide.eclipse.EclipsePlugin
 import org.gradle.plugins.ide.idea.IdeaPlugin
 
@@ -40,6 +42,7 @@ class AptPlugin implements Plugin<Project> {
     }
     project.tasks.withType(JavaCompile, cl)
     project.tasks.withType(GroovyCompile, cl)
+    project.tasks.withType(ScalaCompile, cl)
 
     project.plugins.withType(JavaBasePlugin) {
       def javaConvention = project.convention.getPlugin(JavaPluginConvention)
@@ -90,6 +93,12 @@ class AptPlugin implements Plugin<Project> {
       def javaConvention = project.convention.getPlugin(JavaPluginConvention)
       javaConvention.sourceSets.all { SourceSet sourceSet ->
         configureCompileTask(project, sourceSet, sourceSet.getCompileTaskName("groovy"))
+      }
+    }
+    project.plugins.withType(ScalaBasePlugin) {
+      def javaConvention = project.convention.getPlugin(JavaPluginConvention)
+      javaConvention.sourceSets.all { SourceSet sourceSet ->
+        configureCompileTask(project, sourceSet, sourceSet.getCompileTaskName("scala"))
       }
     }
     configureIdeaProject(project)
