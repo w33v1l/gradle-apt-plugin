@@ -17,6 +17,7 @@ group = 'net.ltgt.gradle'
 if (JavaVersion.current().isJava9Compatible()) {
     tasks.withType(JavaCompile).all { options.compilerArgs.addAll(['-release', '7']) }
     tasks.withType(GroovyCompile).all { options.compilerArgs.addAll(['-release', '7']) }
+    tasks.withType(ScalaCompile).all { options.compilerArgs.addAll(['-release', '7']) }
 }
 gradle.taskGraph.whenReady { graph ->
     if (graph.hasTask(publishPlugins)) {
